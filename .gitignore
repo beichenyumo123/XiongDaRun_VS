@@ -1,0 +1,9 @@
+# 忽略所有
+*
+
+# 只追踪 Private 和 Public 文件夹
+!Private/
+!Public/
+
+# 保留 .gitignore 本身
+!.gitignore

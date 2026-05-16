@@ -41,10 +41,15 @@ public:
 	// 新增：触发器盒子，玩家踩到这里就会触发生成和销毁
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UBoxComponent* TriggerBox;
-	// --- 新增：森林环境装饰 (使用 HISM 提升性能) ---
-	// 实例化组件，用于高效渲染大量相同的树木
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Environment")
-	UHierarchicalInstancedStaticMeshComponent* TreeHISM;
+
+	// --- 修改：支持多种森林环境装饰 (动态 HISM) ---
+	// 在蓝图中配置多种模型（不同种类的树、石头、草丛）
+	UPROPERTY(EditAnywhere, Category = "Environment")
+	TArray<class UStaticMesh*> EnvironmentMeshes;
+
+	// 运行时动态生成的 HISM 组件列表（不需要暴露给蓝图）
+	UPROPERTY()
+	TArray<UHierarchicalInstancedStaticMeshComponent*> EnvironmentHISMs;
 
 	// 获取当前跑道末端的位置（世界坐标和旋转）
 	UFUNCTION(BlueprintCallable, Category = "Floor")

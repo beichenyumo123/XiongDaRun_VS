@@ -10,6 +10,8 @@
 #include "WordGenerate.h"            // 引入我们的 GameMode
 #include "Coin.h" 
 #include "ObstacleBase.h"
+#include "Components/HierarchicalInstancedStaticMeshComponent.h" // 引入 HISM
+
 // Sets default values
 AFloorSegment::AFloorSegment()
 {
@@ -34,6 +36,7 @@ AFloorSegment::AFloorSegment()
     TriggerBox->SetupAttachment(RootComponent);
     // 设置碰撞预设为 Trigger (只检测重叠，不产生物理阻挡)
     TriggerBox->SetCollisionProfileName(TEXT("Trigger"));
+
 }
 
 // Called when the game starts or when spawned
@@ -45,9 +48,25 @@ void AFloorSegment::BeginPlay()
     {
         TriggerBox->OnComponentBeginOverlap.AddDynamic(this, &AFloorSegment::OnTriggerBoxOverlap);
     }
+    // --- 核心修改：动态创建 HISM 组件池 ---
+// 根据蓝图中配置的模型数组，动态创建对应的 HISM 组件
+    for (UStaticMesh* Mesh : EnvironmentMeshes)
+    {
+        if (Mesh)
+        {
+            // 在运行时动态生成组件
+            UHierarchicalInstancedStaticMeshComponent* NewHISM = NewObject<UHierarchicalInstancedStaticMeshComponent>(this);
+            NewHISM->SetStaticMesh(Mesh);
+            NewHISM->SetCollisionEnabled(ECollisionEnabled::NoCollision); // 背景不需要物理碰撞
+            NewHISM->SetupAttachment(RootComponent);
+            NewHISM->RegisterComponent(); // 动态创建的组件必须注册才能在场景中渲染
 
-    // 新增：跑道一生成，就立刻在自己身上撒金币
-    //SpawnItems();
+            // 存入数组供后续生成调用
+            EnvironmentHISMs.Add(NewHISM);
+        }
+    }
+    // 跑道生成时，同时在两侧生成森林背景
+    SpawnEnvironment();
 }
 
 // Called every frame
@@ -147,5 +166,47 @@ void AFloorSegment::SpawnItems(bool bIsSafeZone)
                 }
             }
         }
+    }
+}
+
+// --- 核心新增：生成森林环境 ---
+void AFloorSegment::SpawnEnvironment()
+{
+    // 如果没有配置任何环境模型（或者 HISM 组件没生成成功），直接跳过
+    if (EnvironmentHISMs.Num() == 0) return;
+
+    // 计算沿跑道方向每棵树的间距
+    float Spacing = FloorLength / TreesPerSide;
+
+    for (int32 i = 0; i < TreesPerSide; i++)
+    {
+        // X 轴的基础位置
+        float BaseX = i * Spacing + (Spacing * 0.5f);
+
+        // 为了自然，给位置加一点随机性，不要排列得像电线杆一样死板
+        float RandomXOffset = FMath::RandRange(-50.0f, 50.0f);
+        float RandomYOffset = FMath::RandRange(-100.0f, 100.0f);
+
+        // 随机缩放和旋转
+        float RandomScale = FMath::RandRange(0.8f, 1.5f);
+        FRotator RandomRot(0.0f, FMath::RandRange(0.0f, 360.0f), 0.0f);
+
+        // --- 1. 生成左侧的装饰物 ---
+        // 随机选一种模型对应的 HISM 组件
+        int32 RandomLeftIndex = FMath::RandRange(0, EnvironmentHISMs.Num() - 1);
+
+        FVector LeftLocation(BaseX + RandomXOffset, -TreeSpawnOffset + RandomYOffset, 0.0f);
+        FTransform LeftTransform(RandomRot, LeftLocation, FVector(RandomScale));
+        EnvironmentHISMs[RandomLeftIndex]->AddInstance(LeftTransform);
+
+        // --- 2. 生成右侧的装饰物 ---
+        // 重新随机一下大小、旋转和模型种类，让左右不一样
+        RandomScale = FMath::RandRange(0.8f, 1.5f);
+        RandomRot = FRotator(0.0f, FMath::RandRange(0.0f, 360.0f), 0.0f);
+        int32 RandomRightIndex = FMath::RandRange(0, EnvironmentHISMs.Num() - 1);
+
+        FVector RightLocation(BaseX + RandomXOffset, TreeSpawnOffset + RandomYOffset, 0.0f);
+        FTransform RightTransform(RandomRot, RightLocation, FVector(RandomScale));
+        EnvironmentHISMs[RandomRightIndex]->AddInstance(RightTransform);
     }
 }

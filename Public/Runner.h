@@ -53,6 +53,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "State")
 	void Die();
 
+
+	// --- 新增：通知蓝图玩家已死亡，用于弹出 UI ---
+	UFUNCTION(BlueprintImplementableEvent, Category = "Runner|Events")
+	void OnPlayerDiedBP();
+
 protected:
 
 	// --- 新增：摄像机与弹簧臂 ---

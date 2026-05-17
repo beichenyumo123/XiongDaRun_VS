@@ -117,6 +117,13 @@ void ARunner::Die()
 	GetCharacterMovement()->DisableMovement();
 
 	// 调试信息：在屏幕上打印死亡提示
+	/*if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("WASTED! You hit an obstacle."));
+	}*/
+	// 触发蓝图事件
+	OnPlayerDiedBP();
+
 	if (GEngine)
 	{
 		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("WASTED! You hit an obstacle."));

@@ -13,6 +13,42 @@ class ACoin;
 class AObstacleBase;
 class UHierarchicalInstancedStaticMeshComponent; // 引入 HISM 组件
 
+// --- 新增：定义轨道上可生成的物品类型 ---
+UENUM(BlueprintType)
+enum class ESpawnItemType : uint8
+{
+	None       UMETA(DisplayName = "空 (Empty)"),
+	Coin       UMETA(DisplayName = "金币 (Coin)"),
+	Obstacle   UMETA(DisplayName = "障碍物 (Obstacle)")
+};
+// --- 新增：定义一排的生成阵型 ---
+USTRUCT(BlueprintType)
+struct FRowSpawnPattern
+{
+	GENERATED_BODY()
+
+	// 规定长度必须是3，分别对应 左、中、右 轨道
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Pattern")
+	TArray<ESpawnItemType> LaneItems;
+
+	FRowSpawnPattern()
+	{
+		// 默认初始化为3个空位
+		LaneItems.Init(ESpawnItemType::None, 3);
+	}
+};
+
+// --- 核心升级：定义一个区块（连续多排）的预制件 ---
+USTRUCT(BlueprintType)
+struct FChunkSpawnPattern
+{
+	GENERATED_BODY()
+
+	// 包含连续多排的阵型（比如可以配置成一个 S型金币轨迹 或 跨栏组合）
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Pattern")
+	TArray<FRowSpawnPattern> Rows;
+};
+
 UCLASS()
 class XIONGDARUN_V2_API AFloorSegment : public AActor
 {
@@ -78,6 +114,14 @@ protected:
 
 	UPROPERTY(EditAnywhere, Category = "Spawner")
 	float FloorLength = 1000.0f;
+
+	// --- 修改：允许蓝图配置的安全区块阵型库 ---
+	UPROPERTY(EditAnywhere, Category = "Spawner|Patterns")
+	TArray<FChunkSpawnPattern> ChunkPatterns;
+
+	// --- 新增：允许蓝图配置的安全阵型库 ---
+	UPROPERTY(EditAnywhere, Category = "Spawner|Patterns")
+	TArray<FRowSpawnPattern> SafePatterns;
 
 	// --- 森林生成配置 ---
 	UPROPERTY(EditAnywhere, Category = "Environment")

@@ -112,55 +112,68 @@ FTransform AFloorSegment::GetAttachTransform() const
     return GetActorTransform();
 }
 
-
+// --- 核心修改：使用区块阵型驱动生成 ---
 void AFloorSegment::SpawnItems(bool bIsSafeZone)
 {
     if (!GetWorld()) return;
 
-    float Spacing = FloorLength / (SpawnRows + 1);
-
-    for (int32 Row = 1; Row <= SpawnRows; Row++)
+    // 1. 如果是安全区（前几段跑道），只在中间生成少量金币作为引导
+    if (bIsSafeZone)
     {
-        int32 ObstacleCount = 0;
+        float SafeSpacing = FloorLength / (SpawnRows + 1);
+        for (int32 Row = 1; Row <= SpawnRows; Row++)
+        {
+            if (CoinClass && FMath::FRand() < 0.5f)
+            {
+                FVector LocalLocation(SafeSpacing * Row, 0.0f, 40.0f);
+                FVector WorldLocation = GetActorTransform().TransformPosition(LocalLocation);
+                GetWorld()->SpawnActor<ACoin>(CoinClass, WorldLocation, FRotator::ZeroRotator);
+            }
+        }
+        return;
+    }
 
+    // 2. 非安全区：抽取一个完整的区块预制件（Chunk）
+    if (ChunkPatterns.Num() == 0) return;
+
+    // 随机抽取一个区块剧本（例如：波浪金币组、左躲右闪障碍组）
+    int32 RandomChunkIndex = FMath::RandRange(0, ChunkPatterns.Num() - 1);
+    FChunkSpawnPattern SelectedChunk = ChunkPatterns[RandomChunkIndex];
+
+    // 实际生成的排数取决于你在蓝图里为这个 Chunk 配置了多少排
+    int32 ActualRows = SelectedChunk.Rows.Num();
+    if (ActualRows == 0) return;
+
+    // 动态计算行间距，确保整个区块均匀分布在这段跑道上
+    float Spacing = FloorLength / (ActualRows + 1);
+
+    for (int32 RowIndex = 0; RowIndex < ActualRows; RowIndex++)
+    {
+        FRowSpawnPattern CurrentPattern = SelectedChunk.Rows[RowIndex];
+        int32 Row = RowIndex + 1;
+
+        // 解析当前排的左中右轨道
         for (int32 Lane = 0; Lane < 3; Lane++)
         {
-            bool bSpawnObstacle = false;
-            bool bSpawnCoin = false;
+            if (Lane < CurrentPattern.LaneItems.Num())
+            {
+                ESpawnItemType ItemToSpawn = CurrentPattern.LaneItems[Lane];
 
-            //核心修改：检查 ObstacleClasses 数组里是否有东西
-            if (!bIsSafeZone && ObstacleClasses.Num() > 0 && ObstacleCount < 2 && FMath::FRand() < 0.2f)
-            {
-                bSpawnObstacle = true;
-                ObstacleCount++;
-            }
-            // 金币不受安全区影响，一开始就可以吃金币
-            else if (CoinClass && FMath::FRand() < 0.4f)
-            {
-                bSpawnCoin = true;
-            }
-
-            // --- 开始生成物体 ---
-            if (bSpawnObstacle || bSpawnCoin)
-            {
                 float YOffset = (Lane - 1) * LaneWidth;
-
-                // Z=50 是为了防止穿模，如果障碍物模型比较高，你可以在蓝图里调，或者这里再加高点
                 FVector LocalLocation(Spacing * Row, YOffset, 40.0f);
                 FVector WorldLocation = GetActorTransform().TransformPosition(LocalLocation);
 
-                if (bSpawnObstacle)
+                if (ItemToSpawn == ESpawnItemType::Obstacle && ObstacleClasses.Num() > 0)
                 {
                     int32 RandomIndex = FMath::RandRange(0, ObstacleClasses.Num() - 1);
                     TSubclassOf<AObstacleBase> SelectedObstacleClass = ObstacleClasses[RandomIndex];
 
-                    // 如果抽到的类不为空，才进行生成
                     if (SelectedObstacleClass)
                     {
                         GetWorld()->SpawnActor<AObstacleBase>(SelectedObstacleClass, WorldLocation, FRotator::ZeroRotator);
                     }
                 }
-                else if (bSpawnCoin)
+                else if (ItemToSpawn == ESpawnItemType::Coin && CoinClass)
                 {
                     GetWorld()->SpawnActor<ACoin>(CoinClass, WorldLocation, FRotator::ZeroRotator);
                 }

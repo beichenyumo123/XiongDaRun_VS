@@ -5,6 +5,8 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Components/SphereComponent.h" // 引入球形组件头文件
+#include "Coin.h"                        // 引入金币头文件进行吸引交互
 
 // Sets default values
 ARunner::ARunner()
@@ -38,6 +40,15 @@ ARunner::ARunner()
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationYaw = false;
 	bUseControllerRotationRoll = false;
+
+	// --- 4. 配置磁吸球组件 ---
+	MagnetSphere = CreateDefaultSubobject<USphereComponent>(TEXT("MagnetSphere"));
+	MagnetSphere->SetupAttachment(RootComponent);
+	MagnetSphere->SetSphereRadius(MagnetRadius);
+
+	// 性能优化：初始时，磁吸球不启用任何物理碰撞和检测事件，防止不必要的重叠扫描
+	MagnetSphere->SetCollisionProfileName(TEXT("NoCollision"));
+	MagnetSphere->SetGenerateOverlapEvents(false);
 }
 
 // Called when the game starts or when spawned
@@ -45,6 +56,13 @@ void ARunner::BeginPlay()
 {
 	Super::BeginPlay();
 	TargetY = GetActorLocation().Y;
+
+	// 绑定磁力球的重叠回调
+	if (MagnetSphere)
+	{
+		MagnetSphere->OnComponentBeginOverlap.AddDynamic(this, &ARunner::OnMagnetSphereOverlap);
+	}
+
 }
 
 // Called every frame
@@ -99,7 +117,7 @@ void ARunner::AddCoin()
 {
 	CoinCount++;
 	// 可选：在左上角打印调试信息，方便我们测试
-	UE_LOG(LogTemp, Warning, TEXT("Coins Collected: %d"), CoinCount);
+	//UE_LOG(LogTemp, Warning, TEXT("Coins Collected: %d"), CoinCount);
 	if (GEngine)
 	{
 		GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Yellow, FString::Printf(TEXT("Coins: %d"), CoinCount));
@@ -116,6 +134,10 @@ void ARunner::Die()
 	// 停止所有移动
 	GetCharacterMovement()->DisableMovement();
 
+	// 死亡时，顺手关闭磁力计时器和磁铁状态，杜绝任何空中遗留金币报错
+	GetWorldTimerManager().ClearTimer(MagnetTimerHandle);
+
+
 	// 调试信息：在屏幕上打印死亡提示
 	/*if (GEngine)
 	{
@@ -127,5 +149,75 @@ void ARunner::Die()
 	if (GEngine)
 	{
 		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("WASTED! You hit an obstacle."));
+	}
+}
+
+// ==========================================
+// --- 核心实现：磁力技能状态流转 ---
+// ==========================================
+
+void ARunner::ActivateMagnet()
+{
+	if (bIsDead) return;
+
+	bIsMagnetActive = true;
+
+	// 1. 设置计时器。如果已经吃到了一个磁铁，该调用会自动清除旧计时器、覆盖重置并重新倒计时！
+	GetWorldTimerManager().SetTimer(MagnetTimerHandle, this, &ARunner::DeactivateMagnet, MagnetDuration, false);
+
+	// 2. 启用磁力球组件的物理检测与重叠
+	if (MagnetSphere)
+	{
+		MagnetSphere->SetSphereRadius(MagnetRadius); // 确保半径是最新的
+		MagnetSphere->SetCollisionProfileName(TEXT("OverlapAllDynamic"));
+		MagnetSphere->SetGenerateOverlapEvents(true);
+
+		// 3. 细节抛光：当玩家刚吃起磁铁的瞬间，我们应当将【原本就已经在这球体区域内的金币】瞬间捕获并吸引过来。
+		TArray<AActor*> OverlappingActors;
+		MagnetSphere->GetOverlappingActors(OverlappingActors, ACoin::StaticClass());
+		for (AActor* Actor : OverlappingActors)
+		{
+			ACoin* OverlappedCoin = Cast<ACoin>(Actor);
+			if (OverlappedCoin)
+			{
+				OverlappedCoin->AttractTo(this);
+			}
+		}
+	}
+
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(1, 3.0f, FColor::Cyan, TEXT("MAGNET ACTIVE! Nearby coins will fly to you!"));
+	}
+}
+
+void ARunner::DeactivateMagnet()
+{
+	bIsMagnetActive = false;
+
+	// 关闭磁吸球的物理重叠，拒绝新的金币检测
+	if (MagnetSphere)
+	{
+		MagnetSphere->SetCollisionProfileName(TEXT("NoCollision"));
+		MagnetSphere->SetGenerateOverlapEvents(false);
+	}
+
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(1, 3.0f, FColor::Silver, TEXT("Magnet Expired."));
+	}
+}
+
+void ARunner::OnMagnetSphereOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+	// 如果磁吸开启时触发了重叠，判断是否为金币
+	if (bIsMagnetActive && OtherActor && OtherActor->IsA(ACoin::StaticClass()))
+	{
+		ACoin* Coin = Cast<ACoin>(OtherActor);
+		if (Coin)
+		{
+			// 命令金币向自身飞来
+			Coin->AttractTo(this);
+		}
 	}
 }

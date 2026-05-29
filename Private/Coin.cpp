@@ -9,8 +9,12 @@
 // Sets default values
 ACoin::ACoin()
 {
- 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = false;
+    // =========================================================================
+    // 【高级性能优化】：开启 Tick 功能，但是默认【关闭】运行时的 Tick 轮询。
+    // 只有当金币被磁铁吸附时，我们才动态开启 Tick，平时对 CPU 消耗为零。
+    // =========================================================================
+    PrimaryActorTick.bCanEverTick = true;
+    PrimaryActorTick.bStartWithTickEnabled = false;
 
     // 1. 初始化碰撞球，并设为根组件
     CollisionSphere = CreateDefaultSubobject<USphereComponent>(TEXT("CollisionSphere"));
@@ -24,12 +28,13 @@ ACoin::ACoin()
     // 金币网格体本身不需要物理碰撞，只做纯展示
     CoinMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
+    TargetActor = nullptr;
 }
 
 // Called when the game starts or when spawned
 void ACoin::BeginPlay()
 {
-	Super::BeginPlay();
+    Super::BeginPlay();
     // 绑定重叠事件
     if (CollisionSphere)
     {
@@ -40,8 +45,21 @@ void ACoin::BeginPlay()
 // Called every frame
 void ACoin::Tick(float DeltaTime)
 {
-	Super::Tick(DeltaTime);
+    Super::Tick(DeltaTime);
 
+    // 如果处于被吸引状态，执行向目标（主角）飞行的逻辑
+    if (TargetActor)
+    {
+        FVector CurrentLocation = GetActorLocation();
+        FVector TargetLocation = TargetActor->GetActorLocation();
+
+        // 磁吸体验优化：加速度让飞行极具冲击感
+        CurrentFlySpeed += FlyAcceleration * DeltaTime;
+
+        // 使用常量插值平滑移动到玩家
+        FVector NewLocation = FMath::VInterpConstantTo(CurrentLocation, TargetLocation, DeltaTime, CurrentFlySpeed);
+        SetActorLocation(NewLocation);
+    }
 }
 
 void ACoin::OnSphereOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
@@ -60,6 +78,25 @@ void ACoin::OnSphereOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherAc
 
             // 3. 销毁金币自身
             Destroy();
+        }
+    }
+}
+
+void ACoin::AttractTo(AActor* Player)
+{
+    if (Player && !TargetActor)
+    {
+        TargetActor = Player;
+        CurrentFlySpeed = FlySpeed; // 初始化速度
+
+        // 动态激活 Tick，开始飞向玩家
+        SetActorTickEnabled(true);
+
+        // 为了防止多次触发重叠，关闭原有的碰撞体通道（但保留与主角的 overlap 用于最后吃掉）
+        if (CollisionSphere)
+        {
+            CollisionSphere->SetCollisionResponseToAllChannels(ECR_Ignore);
+            CollisionSphere->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
         }
     }
 }

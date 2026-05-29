@@ -6,9 +6,10 @@
 #include "GameFramework/Character.h"
 #include "Runner.generated.h"
 
-// 前向声明摄像机组件
+// 前向声明摄像机与碰撞组件
 class USpringArmComponent;
 class UCameraComponent;
+class USphereComponent;
 
 UCLASS()
 class XIONGDARUN_V2_API ARunner : public ACharacter
@@ -58,6 +59,19 @@ public:
 	UFUNCTION(BlueprintImplementableEvent, Category = "Runner|Events")
 	void OnPlayerDiedBP();
 
+
+	// 激活磁铁状态（供磁铁道具调用）
+	UFUNCTION(BlueprintCallable, Category = "Runner|Powerups")
+	void ActivateMagnet();
+
+	// 熄灭磁铁状态
+	void DeactivateMagnet();
+
+	// 获取当前磁吸状态是否开启
+	UFUNCTION(BlueprintPure, Category = "Runner|Powerups")
+	bool IsMagnetActive() const { return bIsMagnetActive; }
+
+
 protected:
 
 	// --- 新增：摄像机与弹簧臂 ---
@@ -67,6 +81,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
 	UCameraComponent* FollowCamera;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	USphereComponent* MagnetSphere;
 
 	// --- 核心状态与参数配置 ---
 
@@ -88,7 +105,29 @@ protected:
 	// 新增：记录吃到的金币总数
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Runner|Score")
 	int32 CoinCount = 0;
+
+
+	// 磁铁有效持续时间（秒）
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Runner|Config|Magnet")
+	float MagnetDuration = 8.0f;
+
+	// 磁吸范围半径
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Runner|Config|Magnet")
+	float MagnetRadius = 800.0f;
+
+	// 标记当前磁吸是否开启
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Runner|State|Magnet")
+	bool bIsMagnetActive = false;
+
 private:
 	// 目标 Y 轴坐标（我们假设跑酷是沿着 X 轴向前跑，所以左右平移改变的是 Y 轴）
 	float TargetY;
+
+	// 控制磁铁结束的计时器句柄
+	FTimerHandle MagnetTimerHandle;
+
+	// 磁吸检测球的碰撞回调（检测到金币并将其吸过来）
+	UFUNCTION()
+	void OnMagnetSphereOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+
 };

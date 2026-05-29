@@ -10,6 +10,7 @@
 #include "WordGenerate.h"            // 引入我们的 GameMode
 #include "Coin.h" 
 #include "ObstacleBase.h"
+#include "MagnetItem.h"              // 引入新建的磁铁头文件
 #include "Components/HierarchicalInstancedStaticMeshComponent.h" // 引入 HISM
 
 // Sets default values
@@ -176,6 +177,11 @@ void AFloorSegment::SpawnItems(bool bIsSafeZone)
                 else if (ItemToSpawn == ESpawnItemType::Coin && CoinClass)
                 {
                     GetWorld()->SpawnActor<ACoin>(CoinClass, WorldLocation, FRotator::ZeroRotator);
+                }
+                // --- 新增：处理生成吸铁石道具逻辑 ---
+                else if (ItemToSpawn == ESpawnItemType::Magnet && MagnetClass)
+                {
+                    GetWorld()->SpawnActor<AMagnetItem>(MagnetClass, WorldLocation, FRotator::ZeroRotator);
                 }
             }
         }

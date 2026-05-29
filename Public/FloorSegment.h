@@ -11,6 +11,7 @@ class UBoxComponent;
 class UBoxComponent;
 class ACoin;
 class AObstacleBase;
+class AMagnetItem; // 前向声明磁铁
 class UHierarchicalInstancedStaticMeshComponent; // 引入 HISM 组件
 
 // --- 新增：定义轨道上可生成的物品类型 ---
@@ -19,7 +20,8 @@ enum class ESpawnItemType : uint8
 {
 	None       UMETA(DisplayName = "空 (Empty)"),
 	Coin       UMETA(DisplayName = "金币 (Coin)"),
-	Obstacle   UMETA(DisplayName = "障碍物 (Obstacle)")
+	Obstacle   UMETA(DisplayName = "障碍物 (Obstacle)"),
+	Magnet     UMETA(DisplayName = "吸铁石 (Magnet)") // <-- 新增磁铁类型，允许我们在区块剧本里直接配置
 };
 // --- 新增：定义一排的生成阵型 ---
 USTRUCT(BlueprintType)
@@ -105,6 +107,10 @@ protected:
 	// 新增：让蓝图配置生成哪种障碍物
 	UPROPERTY(EditAnywhere, Category = "Spawner")
 	TArray<TSubclassOf<AObstacleBase>> ObstacleClasses;
+
+	// --- 新增：让蓝图配置吸铁石道具类 ---
+	UPROPERTY(EditAnywhere, Category = "Spawner")
+	TSubclassOf<AMagnetItem> MagnetClass;
 
 	UPROPERTY(EditAnywhere, Category = "Spawner")
 	float LaneWidth = 270.0f;

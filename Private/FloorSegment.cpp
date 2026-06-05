@@ -16,8 +16,8 @@
 // Sets default values
 AFloorSegment::AFloorSegment()
 {
- 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = false;
+    // Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
+    PrimaryActorTick.bCanEverTick = false;
 
     // 初始化根组件
     USceneComponent* RootComp = CreateDefaultSubobject<USceneComponent>(TEXT("RootComponent"));
@@ -25,16 +25,16 @@ AFloorSegment::AFloorSegment()
 
     // 初始化跑道网格体
     FloorMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("FloorMesh"));
-    FloorMesh->SetupAttachment(RootComponent);
+    FloorMesh->SetupAttachment(RootComp);
 
     // 初始化附着点 (用于连接下一个跑道)
     AttachPoint = CreateDefaultSubobject<USceneComponent>(TEXT("AttachPoint"));
-    AttachPoint->SetupAttachment(RootComponent);
+    AttachPoint->SetupAttachment(RootComp);
     // 注意：默认情况下 AttachPoint 只是一个点，你需要在蓝图中将其移动到跑道模型的末端。
 
     // --- 新增：初始化触发器 ---
     TriggerBox = CreateDefaultSubobject<UBoxComponent>(TEXT("TriggerBox"));
-    TriggerBox->SetupAttachment(RootComponent);
+    TriggerBox->SetupAttachment(RootComp);
     // 设置碰撞预设为 Trigger (只检测重叠，不产生物理阻挡)
     TriggerBox->SetCollisionProfileName(TEXT("Trigger"));
 
@@ -43,14 +43,14 @@ AFloorSegment::AFloorSegment()
 // Called when the game starts or when spawned
 void AFloorSegment::BeginPlay()
 {
-	Super::BeginPlay();
+    Super::BeginPlay();
     // 在游戏开始时，将我们的 C++ 函数绑定到触发器的“开始重叠”事件上
     if (TriggerBox)
     {
         TriggerBox->OnComponentBeginOverlap.AddDynamic(this, &AFloorSegment::OnTriggerBoxOverlap);
     }
     // --- 核心修改：动态创建 HISM 组件池 ---
-// 根据蓝图中配置的模型数组，动态创建对应的 HISM 组件
+    // 根据蓝图中配置的模型数组，动态创建对应的 HISM 组件
     for (UStaticMesh* Mesh : EnvironmentMeshes)
     {
         if (Mesh)
@@ -73,7 +73,7 @@ void AFloorSegment::BeginPlay()
 // Called every frame
 void AFloorSegment::Tick(float DeltaTime)
 {
-	Super::Tick(DeltaTime);
+    Super::Tick(DeltaTime);
 
 }
 
@@ -113,7 +113,7 @@ FTransform AFloorSegment::GetAttachTransform() const
     return GetActorTransform();
 }
 
-// --- 核心修改：使用区块阵型驱动生成 ---
+// --- 核心修改：使用数组随机生成金币 ---
 void AFloorSegment::SpawnItems(bool bIsSafeZone)
 {
     if (!GetWorld()) return;
@@ -124,11 +124,18 @@ void AFloorSegment::SpawnItems(bool bIsSafeZone)
         float SafeSpacing = FloorLength / (SpawnRows + 1);
         for (int32 Row = 1; Row <= SpawnRows; Row++)
         {
-            if (CoinClass && FMath::FRand() < 0.5f)
+            // 如果配置了金币库，则随机挑一个金币类生成
+            if (CoinClasses.Num() > 0 && FMath::FRand() < 0.5f)
             {
-                FVector LocalLocation(SafeSpacing * Row, 0.0f, 40.0f);
-                FVector WorldLocation = GetActorTransform().TransformPosition(LocalLocation);
-                GetWorld()->SpawnActor<ACoin>(CoinClass, WorldLocation, FRotator::ZeroRotator);
+                int32 RandomCoinIndex = FMath::RandRange(0, CoinClasses.Num() - 1);
+                TSubclassOf<ACoin> SelectedCoinClass = CoinClasses[RandomCoinIndex];
+
+                if (SelectedCoinClass)
+                {
+                    FVector LocalLocation(SafeSpacing * Row, 0.0f, 40.0f);
+                    FVector WorldLocation = GetActorTransform().TransformPosition(LocalLocation);
+                    GetWorld()->SpawnActor<ACoin>(SelectedCoinClass, WorldLocation, FRotator::ZeroRotator);
+                }
             }
         }
         return;
@@ -174,9 +181,16 @@ void AFloorSegment::SpawnItems(bool bIsSafeZone)
                         GetWorld()->SpawnActor<AObstacleBase>(SelectedObstacleClass, WorldLocation, FRotator::ZeroRotator);
                     }
                 }
-                else if (ItemToSpawn == ESpawnItemType::Coin && CoinClass)
+                // --- 修改：从金币数组里随机选一类金币生成 ---
+                else if (ItemToSpawn == ESpawnItemType::Coin && CoinClasses.Num() > 0)
                 {
-                    GetWorld()->SpawnActor<ACoin>(CoinClass, WorldLocation, FRotator::ZeroRotator);
+                    int32 RandomCoinIndex = FMath::RandRange(0, CoinClasses.Num() - 1);
+                    TSubclassOf<ACoin> SelectedCoinClass = CoinClasses[RandomCoinIndex];
+
+                    if (SelectedCoinClass)
+                    {
+                        GetWorld()->SpawnActor<ACoin>(SelectedCoinClass, WorldLocation, FRotator::ZeroRotator);
+                    }
                 }
                 // --- 新增：处理生成吸铁石道具逻辑 ---
                 else if (ItemToSpawn == ESpawnItemType::Magnet && MagnetClass)

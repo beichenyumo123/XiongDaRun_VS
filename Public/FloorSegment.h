@@ -8,7 +8,6 @@
 
 class UBoxComponent;
 // 前向声明金币类
-class UBoxComponent;
 class ACoin;
 class AObstacleBase;
 class AMagnetItem; // 前向声明磁铁
@@ -55,8 +54,8 @@ UCLASS()
 class XIONGDARUN_V2_API AFloorSegment : public AActor
 {
 	GENERATED_BODY()
-	
-public:	
+
+public:
 	// Sets default values for this actor's properties
 	AFloorSegment();
 
@@ -64,7 +63,7 @@ protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
-public:	
+public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
@@ -101,8 +100,9 @@ protected:
 
 	// --- 物品生成配置 ---
 
+	// --- 修改：改用金币类数组，支持在编辑器中配置多种不同样式的金币（铜、银、金等） ---
 	UPROPERTY(EditAnywhere, Category = "Spawner")
-	class TSubclassOf<ACoin> CoinClass;
+	TArray<TSubclassOf<ACoin>> CoinClasses;
 
 	// 新增：让蓝图配置生成哪种障碍物
 	UPROPERTY(EditAnywhere, Category = "Spawner")

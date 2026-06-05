@@ -5,6 +5,7 @@
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Runner.h" // 引入主角的头文件
+#include "Components/CapsuleComponent.h" // 【新增】：引入胶囊体头文件以进行精准碰撞判断
 
 // Sets default values
 ACoin::ACoin()
@@ -70,14 +71,23 @@ void ACoin::OnSphereOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherAc
         ARunner* Runner = Cast<ARunner>(OtherActor);
         if (Runner)
         {
-            // 1. 玩家数据层：金币+1
-            Runner->AddCoin();
+            // =========================================================================
+            // 【核心修复】：精准碰撞检测
+            // 只有当金币碰到了玩家的“身体胶囊体”（Capsule Component），才触发吃金币逻辑。
+            // 这样，当外围的 MagnetSphere（磁吸球）碰到金币时，只触发 Runner.cpp 里的 AttractTo()，
+            // 绝不会在这里提前销毁金币，从而保留了平滑飞向主角的动画！
+            // =========================================================================
+            if (OtherComp == Runner->GetCapsuleComponent())
+            {
+                // 1. 玩家数据层：金币+1
+                Runner->AddCoin();
 
-            // 2. 表现层：通知蓝图去播放声音和特效
-            OnCoinCollectedBP();
+                // 2. 表现层：通知蓝图去播放声音和特效
+                OnCoinCollectedBP();
 
-            // 3. 销毁金币自身
-            Destroy();
+                // 3. 销毁金币自身
+                Destroy();
+            }
         }
     }
 }

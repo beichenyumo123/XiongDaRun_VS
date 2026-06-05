@@ -5,6 +5,7 @@
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Runner.h" 
+#include "Components/CapsuleComponent.h" // 核心新增：引入胶囊体头文件
 
 // Sets default values
 AObstacleBase::AObstacleBase()
@@ -52,12 +53,10 @@ void AObstacleBase::OnObstacleOverlap(UPrimitiveComponent* OverlappedComp, AActo
         // 尝试将撞上来的物体 Cast (类型转换) 为我们的主角
         ARunner* Runner = Cast<ARunner>(OtherActor);
 
-        if (Runner)
+        if (Runner && OtherComp == Runner->GetCapsuleComponent())
         {
-            // 如果成功，说明真的是主角撞上来了，执行主角的 Die 函数！
+            // 如果成功，说明玩家身体（胶囊体）真的撞上了障碍物，执行主角的 Die 函数！
             Runner->Die();
-
-            // 可以选择播放一声爆炸音效或特效（后续在蓝图里加）
         }
     }
 }

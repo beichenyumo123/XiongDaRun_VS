@@ -62,4 +62,8 @@ protected:
 
     // 运行时的实际速度
     float CurrentFlySpeed = 0.0f;
+
+    // --- 新增：金币类型的得分配置 ---
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Coin|Config")
+    int32 CoinValue = 1;
 };
